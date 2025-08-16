@@ -1,0 +1,1557 @@
+{% extends "base.html" %}
+
+{% block title %}Автоподнятие сервера{% endblock %}
+
+{% block content %}
+<div class="auto-deploy-container">
+    <!-- Заголовок страницы -->
+    <div class="deploy-header">
+        <div class="header-content">
+            <h1 class="deploy-title">
+                <span class="rocket-icon">🚀</span>
+                Автоматическое развертывание серверов
+            </h1>
+            <p class="deploy-subtitle">Быстрое и безопасное развертывание VPN-серверов с панелью 3x-ui</p>
+        </div>
+    </div>
+
+    <!-- Статистика серверов -->
+    <div class="stats-overview">
+        <div class="stats-grid">
+            <div class="stat-card servers">
+                <div class="stat-icon">🖥️</div>
+                <div class="stat-content">
+                    <h3>{{ total_capacity.hosts_count }}</h3>
+                    <p>Всего серверов</p>
+                </div>
+            </div>
+            <div class="stat-card configs">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-content">
+                    <h3>{{ total_capacity.total_configs }}</h3>
+                    <p>Активных конфигураций</p>
+                </div>
+            </div>
+            <div class="stat-card capacity">
+                <div class="stat-icon">💾</div>
+                <div class="stat-content">
+                    <h3>{{ total_capacity.total_capacity }}</h3>
+                    <p>Общая емкость</p>
+                </div>
+            </div>
+            <div class="stat-card load">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <h3>{{ total_capacity.load_percentage }}%</h3>
+                    <p>Общая загрузка</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной контент -->
+    <div class="main-content">
+        <!-- Форма развертывания -->
+        <div class="deploy-form-container">
+            <div class="deploy-card">
+                <div class="card-header">
+                    <h2>🆕 Развернуть новый сервер</h2>
+                    <p>Автоматическая установка и настройка VPN-сервера</p>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Индикатор прогресса -->
+                    <div id="deploy-progress" class="deploy-progress hidden">
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill"></div>
+                            </div>
+                            <div class="progress-text">Идет развертывание сервера...</div>
+                        </div>
+                        <div class="progress-steps">
+                            <div class="step" data-step="1">SSH соединение</div>
+                            <div class="step" data-step="2">Установка 3x-ui</div>
+                            <div class="step" data-step="3">Настройка панели</div>
+                            <div class="step" data-step="4">Создание конфигурации</div>
+                        </div>
+                    </div>
+                    
+                    <form id="deploy-form" method="post">
+                        <input type="hidden" name="action" value="deploy">
+                        
+                        <div class="form-group">
+                            <label for="host_name" class="form-label">
+                                <span class="label-icon">🏷️</span>
+                                Имя хоста*
+                            </label>
+                            <input type="text" class="form-input" id="host_name" name="host_name" 
+                                   placeholder="Например: Server-Moscow-1" required>
+                            <div class="form-hint">Уникальное имя для идентификации сервера</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="ssh_host" class="form-label">
+                                <span class="label-icon">🌐</span>
+                                IP адрес / Домен*
+                            </label>
+                            <input type="text" class="form-input" id="ssh_host" name="ssh_host" 
+                                   placeholder="123.456.789.0 или server.example.com" required>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="ssh_username" class="form-label">
+                                    <span class="label-icon">👤</span>
+                                    SSH пользователь*
+                                </label>
+                                <input type="text" class="form-input" id="ssh_username" name="ssh_username" 
+                                       placeholder="root" value="root" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="ssh_port" class="form-label">
+                                    <span class="label-icon">🔌</span>
+                                    SSH порт
+                                </label>
+                                <input type="number" class="form-input" id="ssh_port" name="ssh_port" 
+                                       value="22" min="1" max="65535">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="ssh_password" class="form-label">
+                                <span class="label-icon">🔑</span>
+                                SSH пароль*
+                            </label>
+                            <div class="password-input">
+                                <input type="password" class="form-input" id="ssh_password" name="ssh_password" 
+                                       placeholder="Введите пароль для SSH" required>
+                                <button type="button" class="password-toggle" onclick="togglePassword('ssh_password')">
+                                    👁️
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max_configs" class="form-label">
+                                <span class="label-icon">📊</span>
+                                Максимум конфигураций
+                            </label>
+                            <input type="number" class="form-input" id="max_configs" name="max_configs" 
+                                   value="20" min="1" max="1000">
+                            <div class="form-hint">Лимит VPN-ключей для этого сервера</div>
+                        </div>
+
+                        <button type="submit" class="deploy-button" id="deploy-btn">
+                            <span class="btn-icon">🚀</span>
+                            <span class="btn-text">Развернуть сервер</span>
+                            <div class="btn-loader hidden">
+                                <div class="loader"></div>
+                            </div>
+                        </button>
+                    </form>
+
+                    <div class="deploy-info">
+                        <div class="info-card">
+                            <span class="info-icon">⏱️</span>
+                            <span>Время развертывания: 3-5 минут</span>
+                        </div>
+                        <div class="info-card">
+                            <span class="info-icon">🛡️</span>
+                            <span>Автоматическая настройка Reality</span>
+                        </div>
+                        <div class="info-card">
+                            <span class="info-icon">⚡</span>
+                            <span>Готовность к работе сразу после установки</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Панель управления серверами -->
+        <div class="server-management">
+            <div class="management-card">
+                <div class="card-header">
+                    <h2>⚙️ Управление серверами</h2>
+                    <p>Настройка лимитов и синхронизация данных</p>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Глобальные настройки -->
+                    <div class="global-settings">
+                        <h3>🌐 Глобальные настройки</h3>
+                        <form method="post" class="settings-form">
+                            <input type="hidden" name="action" value="update_limits">
+                            
+                            <div class="form-group">
+                                <label for="global_limit" class="form-label">
+                                    <span class="label-icon">📊</span>
+                                    Глобальный лимит конфигураций
+                                </label>
+                                <input type="number" class="form-input" id="global_limit" name="global_limit" 
+                                       placeholder="20" min="1" max="1000">
+                                <div class="form-hint">Применить лимит ко всем серверам</div>
+                            </div>
+
+                            <button type="submit" class="action-button success">
+                                <span class="btn-icon">✅</span>
+                                <span>Обновить лимиты</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Индивидуальные настройки серверов -->
+                    {% if load_stats %}
+                    <div class="individual-settings">
+                        <h3>🖥️ Индивидуальные настройки</h3>
+                        <form method="post" class="servers-form">
+                            <input type="hidden" name="action" value="update_limits">
+                            
+                            <div class="servers-list">
+                                {% for host in load_stats %}
+                                <div class="server-item">
+                                    <div class="server-info">
+                                        <div class="server-name">{{ host.host_name }}</div>
+                                        <div class="server-stats">
+                                            {{ host.current_configs }}/{{ host.max_configs }} 
+                                            ({{ "%.1f"|format(host.load_percentage) }}%)
+                                        </div>
+                                    </div>
+                                    <div class="server-control">
+                                        <input type="number" class="server-limit-input" 
+                                               name="limit_{{ host.host_name }}" 
+                                               value="{{ host.max_configs }}" 
+                                               min="1" max="1000">
+                                        <div class="load-indicator">
+                                            <div class="load-bar">
+                                                {% set load_class = "low" if host.load_percentage < 50 else "medium" if host.load_percentage < 80 else "high" %}
+                                                <div class="load-fill {{ load_class }}" 
+                                                     style="width: {{ host.load_percentage }}%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <button type="submit" class="action-button success">
+                                <span class="btn-icon">🔧</span>
+                                <span>Применить изменения</span>
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+
+                    <!-- Действия системы -->
+                    <div class="system-actions">
+                        <h3>🔄 Системные действия</h3>
+                        <div class="actions-grid">
+                            <form method="post" class="action-form">
+                                <input type="hidden" name="action" value="sync_counters">
+                                <button type="submit" class="action-button warning">
+                                    <span class="btn-icon">🔄</span>
+                                    <span>Синхронизировать счетчики</span>
+                                </button>
+                                <div class="action-hint">Обновляет данные о конфигурациях</div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Детальная статистика серверов -->
+    {% if load_stats %}
+    <div class="servers-stats">
+        <div class="stats-card">
+            <div class="card-header">
+                <h2>📈 Детальная статистика серверов</h2>
+                <p>Полная информация о загрузке и состоянии серверов</p>
+            </div>
+            
+            <div class="card-body">
+                <div class="servers-table">
+                    <div class="table-header">
+                        <div class="col-server">Сервер</div>
+                        <div class="col-usage">Использование</div>
+                        <div class="col-limit">Лимит</div>
+                        <div class="col-load">Загрузка</div>
+                        <div class="col-progress">Прогресс</div>
+                        <div class="col-status">Статус</div>
+                    </div>
+                    
+                    <div class="table-body">
+                        {% for host in load_stats %}
+                        <div class="table-row">
+                            <div class="col-server">
+                                <div class="server-name">{{ host.host_name }}</div>
+                            </div>
+                            <div class="col-usage">
+                                <span class="usage-count">{{ host.current_configs }}</span>
+                            </div>
+                            <div class="col-limit">
+                                <span class="limit-count">{{ host.max_configs }}</span>
+                            </div>
+                            <div class="col-load">
+                                <span class="load-percentage">{{ "%.1f"|format(host.load_percentage) }}%</span>
+                            </div>
+                            <div class="col-progress">
+                                <div class="progress-container">
+                                    {% set load_class = "low" if host.load_percentage < 50 else "medium" if host.load_percentage < 80 else "high" %}
+                                    <div class="progress-bar {{ load_class }}">
+                                        <div class="progress-fill" style="width: {{ host.load_percentage }}%"></div>
+                                        <span class="progress-text">{{ host.current_configs }}/{{ host.max_configs }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-status">
+                                {% if host.load_percentage < 50 %}
+                                    <span class="status-badge free">🟢 Свободен</span>
+                                {% elif host.load_percentage < 80 %}
+                                    <span class="status-badge filling">🟡 Заполняется</span>
+                                {% elif host.load_percentage < 100 %}
+                                    <span class="status-badge almost-full">🟠 Почти полон</span>
+                                {% else %}
+                                    <span class="status-badge full">🔴 Заполнен</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Таблица развернутых панелей -->
+    {% if auto_deploy_data %}
+    <div class="deployed-panels">
+        <div class="panels-card">
+            <div class="card-header">
+                <h2>🗂️ Развернутые панели</h2>
+                <p>Список всех панелей, развернутых через автодеплой</p>
+            </div>
+            
+            <div class="card-body">
+                <div class="panels-table">
+                    <div class="table-header">
+                        <div class="col-name">Имя</div>
+                        <div class="col-host">Хост</div>
+                        <div class="col-panel">Панель</div>
+                        <div class="col-credentials">Данные доступа</div>
+                        <div class="col-status">Статус</div>
+                        <div class="col-created">Создан</div>
+                    </div>
+                    
+                    <div class="table-body">
+                        {% for panel in auto_deploy_data %}
+                        <div class="table-row">
+                            <div class="col-name">
+                                <div class="panel-name">{{ panel.name }}</div>
+                            </div>
+                            <div class="col-host">
+                                <div class="host-info">
+                                    <div class="host-ip">{{ panel.ssh_host }}</div>
+                                    <div class="ssh-port">SSH: {{ panel.new_ssh_port if panel.new_ssh_port else panel.ssh_port }}</div>
+                                </div>
+                            </div>
+                            <div class="col-panel">
+                                {% if panel.panel_url %}
+                                    <a href="{{ panel.panel_url }}" target="_blank" class="panel-link">
+                                        {{ panel.ssh_host }}:{{ panel.panel_port }}{{ panel.panel_secpath }}
+                                    </a>
+                                {% else %}
+                                    <div class="panel-info">
+                                        <div class="panel-port">Порт: {{ panel.panel_port }}</div>
+                                        <div class="panel-secpath">Путь: {{ panel.panel_secpath }}</div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-credentials">
+                                <div class="credentials-info">
+                                    <div class="username">
+                                        👤 {{ panel.panel_username }}
+                                        <button class="copy-btn" onclick="copyToClipboard('{{ panel.panel_username }}')" title="Копировать логин">📋</button>
+                                    </div>
+                                    <div class="password">
+                                        🔑 {{ panel.panel_password }}
+                                        <button class="copy-btn" onclick="copyToClipboard('{{ panel.panel_password }}')" title="Копировать пароль">📋</button>
+                                    </div>
+                                    {% if panel.new_ssh_port %}
+                                    <div class="ssh-port">
+                                        🔌 SSH Port: {{ panel.new_ssh_port }}
+                                        <button class="copy-btn" onclick="copyToClipboard('{{ panel.new_ssh_port }}')" title="Копировать SSH порт">📋</button>
+                                    </div>
+                                    {% endif %}
+                                    {% if panel.new_ssh_password %}
+                                    <div class="ssh-password">
+                                        🔐 SSH Password: {{ panel.new_ssh_password }}
+                                        <button class="copy-btn" onclick="copyToClipboard('{{ panel.new_ssh_password }}')" title="Копировать SSH пароль">📋</button>
+                                    </div>
+                                    {% endif %}
+                                    {% if panel.ssh_public_key %}
+                                    <div class="ssh-key">
+                                        🔐 SSH Key: 
+                                        <span class="ssh-key-text" title="{{ panel.ssh_public_key }}" onclick="copyToClipboard('{{ panel.ssh_public_key }}')">{{ panel.ssh_public_key }}</span>
+                                        <button class="copy-btn" onclick="copyToClipboard('{{ panel.ssh_public_key }}')" title="Копировать SSH ключ">📋</button>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-status">
+                                {% if panel.status == 'completed' %}
+                                    <span class="status-badge success">✅ Завершен</span>
+                                {% elif panel.status == 'deploying' %}
+                                    <span class="status-badge deploying">🔄 Деплой</span>
+                                {% elif panel.status == 'error' %}
+                                    <span class="status-badge error">❌ Ошибка</span>
+                                {% else %}
+                                    <span class="status-badge unknown">❓ {{ panel.status }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="col-created">
+                                <div class="created-date">{{ panel.created_at }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* Стили для страницы auto-deploy */
+.auto-deploy-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Заголовок страницы */
+.deploy-header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 40px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.deploy-title {
+    font-size: 3rem;
+    font-weight: 700;
+    color: white;
+    margin: 0 0 15px 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.rocket-icon {
+    display: inline-block;
+    margin-right: 15px;
+    font-size: 3.5rem;
+    animation: rocket-bounce 2s infinite;
+}
+
+@keyframes rocket-bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+
+.deploy-subtitle {
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+    font-weight: 400;
+}
+
+/* Статистика */
+.stats-overview {
+    margin-bottom: 40px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 25px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+    min-width: 60px;
+    text-align: center;
+}
+
+.stat-content h3 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: #2c3e50;
+}
+
+.stat-content p {
+    margin: 5px 0 0 0;
+    color: #7f8c8d;
+    font-weight: 500;
+}
+
+/* Основной контент */
+.main-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 40px;
+}
+
+@media (max-width: 1024px) {
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Карточки */
+.deploy-card, .management-card, .stats-card, .panels-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    overflow: hidden;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 30px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.card-header h2 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+}
+
+.card-header p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 1rem;
+}
+
+.card-body {
+    padding: 30px;
+}
+
+/* Формы */
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+.form-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.label-icon {
+    font-size: 1.2rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 15px 20px;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: #fff;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.password-input {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 5px;
+    transition: background 0.2s ease;
+}
+
+.password-toggle:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.form-hint {
+    margin-top: 5px;
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+/* Кнопки */
+.deploy-button, .action-button {
+    position: relative;
+    width: 100%;
+    padding: 18px 25px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.deploy-button:hover, .action-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.action-button.success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.action-button.warning {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+}
+
+.btn-icon {
+    font-size: 1.2rem;
+}
+
+/* Прогресс деплоя */
+.deploy-progress {
+    margin-bottom: 30px;
+    padding: 25px;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+    border-radius: 15px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.progress-container {
+    margin-bottom: 20px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.5s ease;
+    animation: progress-pulse 2s infinite;
+}
+
+@keyframes progress-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.progress-text {
+    text-align: center;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.progress-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.step {
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #6c757d;
+    transition: all 0.3s ease;
+}
+
+.step.active {
+    background: #667eea;
+    color: white;
+}
+
+/* Информационные карточки */
+.deploy-info {
+    margin-top: 30px;
+    display: grid;
+    gap: 15px;
+}
+
+.info-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+}
+
+.info-icon {
+    font-size: 1.3rem;
+}
+
+/* Управление серверами */
+.global-settings, .individual-settings, .system-actions {
+    margin-bottom: 30px;
+}
+
+.global-settings h3, .individual-settings h3, .system-actions h3 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.servers-list {
+    margin-bottom: 25px;
+}
+
+.server-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 12px;
+    margin-bottom: 15px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.server-info {
+    flex: 1;
+}
+
+.server-name {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+
+.server-stats {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.server-control {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.server-limit-input {
+    width: 80px;
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.load-indicator {
+    width: 100px;
+}
+
+.load-bar {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.load-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.load-fill.low {
+    background: linear-gradient(90deg, #28a745, #20c997);
+}
+
+.load-fill.medium {
+    background: linear-gradient(90deg, #ffc107, #fd7e14);
+}
+
+.load-fill.high {
+    background: linear-gradient(90deg, #dc3545, #e74c3c);
+}
+
+.action-hint {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: #6c757d;
+    text-align: center;
+}
+
+/* Таблица статистики */
+.servers-table {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.table-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 2fr 1.5fr;
+    gap: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.table-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 2fr 1.5fr;
+    gap: 20px;
+    padding: 20px;
+    border-bottom: 1px solid #f8f9fa;
+    align-items: center;
+    transition: background 0.2s ease;
+}
+
+.table-row:hover {
+    background: rgba(102, 126, 234, 0.02);
+}
+
+.table-row:last-child {
+    border-bottom: none;
+}
+
+.progress-container {
+    position: relative;
+}
+
+.progress-bar {
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #2c3e50;
+    z-index: 2;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-badge.free {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+
+.status-badge.filling {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.status-badge.almost-full {
+    background: rgba(253, 126, 20, 0.1);
+    color: #fd7e14;
+}
+
+.status-badge.full {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+/* Утилиты */
+.hidden {
+    display: none !important;
+}
+
+/* Loader */
+.loader {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 2px solid white;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .deploy-title {
+        font-size: 2rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .table-header, .table-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .server-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+    
+    .server-control {
+        justify-content: space-between;
+    }
+}
+
+/* Стили для таблицы развернутых панелей */
+.deployed-panels {
+    margin-top: 40px;
+}
+
+.panels-table {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.panels-table .table-header {
+    display: grid;
+    grid-template-columns: 1.5fr 1.5fr 1.5fr 2fr 1fr 1.2fr;
+    gap: 15px;
+    padding: 20px;
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.panels-table .table-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1.5fr 1.5fr 2fr 1fr 1.2fr;
+    gap: 15px;
+    padding: 20px;
+    border-bottom: 1px solid #f8f9fa;
+    align-items: center;
+    transition: background 0.2s ease;
+}
+
+.panels-table .table-row:hover {
+    background: rgba(102, 126, 234, 0.02);
+}
+
+.panels-table .table-row:last-child {
+    border-bottom: none;
+}
+
+.panel-name {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.host-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.host-ip {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.ssh-port {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.panel-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.panel-link:hover {
+    color: #764ba2;
+    text-decoration: underline;
+}
+
+.panel-port {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.panel-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.panel-secpath {
+    color: #495057;
+    font-size: 0.85rem;
+    font-family: monospace;
+    background: rgba(248, 249, 250, 0.8);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #e9ecef;
+}
+
+.credentials-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.username, .password, .ssh-key {
+    padding: 4px 8px;
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+}
+
+.ssh-key-text {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: #495057;
+    cursor: pointer;
+    background: #f5f5f5;
+    padding: 2px 4px;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+    word-break: break-all;
+}
+
+.ssh-key-text:hover {
+    background: #e9e9e9;
+}
+
+.copy-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    margin-left: 5px;
+}
+
+.copy-btn:hover {
+    background: #0056b3;
+}
+
+.status-badge.success {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+
+.status-badge.deploying {
+    background: rgba(0, 123, 255, 0.1);
+    color: #007bff;
+}
+
+.status-badge.error {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.status-badge.unknown {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+}
+
+.created-date {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+/* Адаптивность для таблицы панелей */
+@media (max-width: 1200px) {
+    .panels-table .table-header,
+    .panels-table .table-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .panels-table .table-header {
+        display: none; /* Скрываем заголовки на мобильных */
+    }
+    
+    .panels-table .table-row {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        padding: 15px;
+    }
+    
+    .panels-table .table-row > div {
+        margin-bottom: 8px;
+    }
+    
+    .panels-table .table-row > div:before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #6c757d;
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+    }
+}
+</style>
+
+<script>
+// Функция для переключения видимости пароля
+function togglePassword(inputId) {
+    const input = document.getElementById(inputId);
+    const button = input.nextElementSibling;
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        button.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        button.textContent = '👁️';
+    }
+}
+
+// Функция для копирования в буфер обмена
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        // Показываем уведомление
+        const notification = document.createElement('div');
+        notification.textContent = 'Скопировано!';
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-size: 14px;
+        `;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 2000);
+    }).catch(function(err) {
+        console.error('Ошибка копирования:', err);
+    });
+}
+
+// Глобальные переменные для отслеживания деплоя
+let deploySessionId = null;
+let deployStatusInterval = null;
+
+// Флаг для предотвращения повторных отправок
+let isDeployInProgress = false;
+
+// Обработка формы развертывания с прогрессом
+document.getElementById('deploy-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Проверяем, что деплой не идет уже
+    if (isDeployInProgress) {
+        showNotification('Деплой уже выполняется. Дождитесь завершения текущего процесса.', 'error');
+        return;
+    }
+    
+    const deployBtn = document.getElementById('deploy-btn');
+    const deployProgress = document.getElementById('deploy-progress');
+    const formData = new FormData(this);
+    
+    // Устанавливаем флаг
+    isDeployInProgress = true;
+    
+    // Показываем прогресс
+    deployProgress.classList.remove('hidden');
+    deployBtn.disabled = true;
+    deployBtn.querySelector('.btn-text').textContent = 'Запуск развертывания...';
+    deployBtn.querySelector('.btn-loader').classList.remove('hidden');
+    
+    // Отправляем AJAX запрос
+    fetch('/auto-deploy', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(formData)
+    })
+    .then(response => response.text())
+    .then(data => {
+        // Парсим ответ, чтобы получить session_id из flash сообщений
+        if (data.includes('фоновом режиме')) {
+            // Деплой запущен успешно, начинаем отслеживать статус
+            startMockDeployTracking();
+        } else {
+            // Показываем ошибки валидации
+            document.body.innerHTML = data;
+            return;
+        }
+    })
+    .catch(error => {
+        console.error('Deploy error:', error);
+        isDeployInProgress = false; // Сбрасываем флаг при ошибке
+        showDeployError('Ошибка отправки запроса: ' + error.message);
+    });
+});
+
+function startMockDeployTracking() {
+    // Поскольку мы не получаем session_id в стандартном ответе,
+    // симулируем процесс деплоя с реалистичными этапами
+    const steps = document.querySelectorAll('.step');
+    const progressFill = document.querySelector('.progress-fill');
+    const progressText = document.querySelector('.progress-text');
+    
+    let currentStep = 0;
+    let progress = 0;
+    
+    const stepTexts = [
+        'Проверка SSH соединения...',
+        'Установка 3x-ui панели...',
+        'Настройка конфигурации...',
+        'Финализация установки...'
+    ];
+    
+    const deployInterval = setInterval(() => {
+        if (currentStep < 4) {
+            // Активируем текущий шаг
+            steps[currentStep].classList.add('active');
+            progressText.textContent = stepTexts[currentStep];
+            
+            // Обновляем прогресс
+            progress = (currentStep + 1) * 25;
+            progressFill.style.width = progress + '%';
+            
+            currentStep++;
+        } else {
+            // Деплой завершен
+            clearInterval(deployInterval);
+            setTimeout(() => {
+                showDeploySuccess();
+            }, 2000);
+        }
+    }, 30000); // Каждые 30 секунд новый этап
+    
+    // Сохраняем интервал для возможной отмены
+    deployStatusInterval = deployInterval;
+}
+
+function showDeploySuccess() {
+    const deployProgress = document.getElementById('deploy-progress');
+    const deployBtn = document.getElementById('deploy-btn');
+    
+    // Сбрасываем флаг деплоя
+    isDeployInProgress = false;
+    
+    // Показываем успешное завершение
+    const progressText = document.querySelector('.progress-text');
+    progressText.textContent = 'Деплой завершен успешно!';
+    progressText.style.color = '#28a745';
+    
+    // Восстанавливаем кнопку
+    deployBtn.disabled = false;
+    deployBtn.querySelector('.btn-text').textContent = 'Развернуть сервер';
+    deployBtn.querySelector('.btn-loader').classList.add('hidden');
+    
+    // Показываем сообщение об успехе
+    showNotification('Сервер успешно развернут! Обновите страницу для просмотра результатов.', 'success');
+    
+    // Автоматически обновляем страницу через 5 секунд
+    setTimeout(() => {
+        window.location.reload();
+    }, 5000);
+}
+
+function showDeployError(message) {
+    const deployProgress = document.getElementById('deploy-progress');
+    const deployBtn = document.getElementById('deploy-btn');
+    
+    // Сбрасываем флаг деплоя
+    isDeployInProgress = false;
+    
+    // Показываем ошибку
+    const progressText = document.querySelector('.progress-text');
+    progressText.textContent = 'Ошибка деплоя: ' + message;
+    progressText.style.color = '#dc3545';
+    
+    // Восстанавливаем кнопку
+    deployBtn.disabled = false;
+    deployBtn.querySelector('.btn-text').textContent = 'Развернуть сервер';
+    deployBtn.querySelector('.btn-loader').classList.add('hidden');
+    
+    showNotification(message, 'error');
+}
+
+function showNotification(message, type) {
+    // Создаем уведомление
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '❌'}</span>
+            <span class="notification-text">${message}</span>
+            <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+    `;
+    
+    // Добавляем стили, если их нет
+    if (!document.querySelector('#notification-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'notification-styles';
+        styles.textContent = `
+            .notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: white;
+                border-radius: 10px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+                max-width: 400px;
+            }
+            .notification.success {
+                border-left: 4px solid #28a745;
+            }
+            .notification.error {
+                border-left: 4px solid #dc3545;
+            }
+            .notification.warning {
+                border-left: 4px solid #ffc107;
+            }
+            .notification-content {
+                display: flex;
+                align-items: center;
+                padding: 15px 20px;
+                gap: 10px;
+            }
+            .notification-icon {
+                font-size: 1.2rem;
+            }
+            .notification-text {
+                flex: 1;
+                color: #2c3e50;
+            }
+            .notification-close {
+                background: none;
+                border: none;
+                font-size: 1.5rem;
+                cursor: pointer;
+                color: #6c757d;
+                padding: 0;
+                width: 20px;
+                height: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Автоматически удаляем уведомление через 10 секунд
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 10000);
+}
+
+// Анимация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    const cards = document.querySelectorAll('.stat-card, .deploy-card, .management-card');
+    
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+    
+    // Проверяем состояние при загрузке страницы
+    checkPageReloadProtection();
+});
+
+function checkPageReloadProtection() {
+    // Проверяем localStorage на предмет активного деплоя
+    const savedDeployState = localStorage.getItem('deployInProgress');
+    const savedDeployTimestamp = localStorage.getItem('deployTimestamp');
+    
+    if (savedDeployState === 'true' && savedDeployTimestamp) {
+        const deployTime = parseInt(savedDeployTimestamp);
+        const currentTime = Date.now();
+        const timeDiff = currentTime - deployTime;
+        
+        // Если деплой был запущен менее 10 минут назад, показываем предупреждение
+        if (timeDiff < 10 * 60 * 1000) { // 10 минут
+            showNotification('Внимание: деплой может все еще выполняться. Проверьте статус перед запуском нового.', 'warning');
+            
+            // Блокируем форму на 30 секунд
+            const deployBtn = document.getElementById('deploy-btn');
+            deployBtn.disabled = true;
+            deployBtn.querySelector('.btn-text').textContent = 'Ожидание (проверка деплоя...)';
+            
+            setTimeout(() => {
+                deployBtn.disabled = false;
+                deployBtn.querySelector('.btn-text').textContent = 'Развернуть сервер';
+                localStorage.removeItem('deployInProgress');
+                localStorage.removeItem('deployTimestamp');
+            }, 30000);
+        } else {
+            // Старое состояние, очищаем
+            localStorage.removeItem('deployInProgress');
+            localStorage.removeItem('deployTimestamp');
+        }
+    }
+}
+
+// Обновляем функцию отслеживания деплоя
+function startMockDeployTracking() {
+    // Сохраняем состояние в localStorage
+    localStorage.setItem('deployInProgress', 'true');
+    localStorage.setItem('deployTimestamp', Date.now().toString());
+    
+    // Поскольку мы не получаем session_id в стандартном ответе,
+    // симулируем процесс деплоя с реалистичными этапами
+    const steps = document.querySelectorAll('.step');
+    const progressFill = document.querySelector('.progress-fill');
+    const progressText = document.querySelector('.progress-text');
+    
+    let currentStep = 0;
+    let progress = 0;
+    
+    const stepTexts = [
+        'Проверка SSH соединения...',
+        'Установка 3x-ui панели...',
+        'Настройка конфигурации...',
+        'Финализация установки...'
+    ];
+    
+    const deployInterval = setInterval(() => {
+        if (currentStep < 4) {
+            // Активируем текущий шаг
+            steps[currentStep].classList.add('active');
+            progressText.textContent = stepTexts[currentStep];
+            
+            // Обновляем прогресс
+            progress = (currentStep + 1) * 25;
+            progressFill.style.width = progress + '%';
+            
+            currentStep++;
+        } else {
+            // Деплой завершен
+            clearInterval(deployInterval);
+            localStorage.removeItem('deployInProgress');
+            localStorage.removeItem('deployTimestamp');
+            setTimeout(() => {
+                showDeploySuccess();
+            }, 2000);
+        }
+    }, 30000); // Каждые 30 секунд новый этап
+    
+    // Сохраняем интервал для возможной отмены
+    deployStatusInterval = deployInterval;
+}
+</script>
+{% endblock %}
